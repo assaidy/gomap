@@ -1,10 +1,10 @@
 package gomap
 
 import (
+	"math/rand"
+	"strconv"
 	"testing"
 )
-
-// TODO: do bencmarks and comppare with default map type
 
 type CustomKey struct {
 	ID   int
@@ -15,11 +15,11 @@ func TestMap(t *testing.T) {
 	hashFunc := func(k int) int {
 		return k
 	}
-	equalFunc := func(a, b int) bool {
-		return a == b
-	}
+	// equalFunc := func(a, b int) bool {
+	// 	return a == b
+	// }
 
-	m := New[int, string](10, hashFunc, equalFunc)
+	m := New[int, string](hashFunc, ComparableEqualFunc[int], 10)
 
 	t.Run("Set and Get", func(t *testing.T) {
 		m.Set(1, "one")
@@ -69,15 +69,13 @@ func TestMap(t *testing.T) {
 	})
 
 	t.Run("String Keys", func(t *testing.T) {
-		stringMap := New[string, int](10, func(k string) int {
+		stringMap := New[string, int](func(k string) int {
 			sum := 0
 			for _, c := range k {
 				sum += int(c)
 			}
 			return sum
-		}, func(a, b string) bool {
-			return a == b
-		})
+		}, ComparableEqualFunc[string], 10)
 
 		stringMap.Set("one", 1)
 		stringMap.Set("two", 2)
@@ -90,11 +88,11 @@ func TestMap(t *testing.T) {
 	})
 
 	t.Run("Custom Struct Keys", func(t *testing.T) {
-		structMap := New[CustomKey, string](10, func(k CustomKey) int {
+		structMap := New[CustomKey, string](func(k CustomKey) int {
 			return k.ID
 		}, func(a, b CustomKey) bool {
 			return a.ID == b.ID && a.Name == b.Name
-		})
+		}, 10)
 
 		key1 := CustomKey{ID: 1, Name: "Alice"}
 		key2 := CustomKey{ID: 2, Name: "Bob"}
@@ -108,4 +106,131 @@ func TestMap(t *testing.T) {
 			t.Errorf("Expected value 'Designer' for key %+v, got '%v' (ok: %v)", key2, val, ok)
 		}
 	})
+}
+
+func TestIterator(t *testing.T) {
+	hashFunc := func(k int) int {
+		return k
+	}
+	// equalFunc := func(a, b int) bool {
+	// 	return a == b
+	// }
+
+	m := New[int, string](hashFunc, ComparableEqualFunc[int])
+
+	m.Set(1, "one")
+	m.Set(2, "two")
+	m.Set(3, "three")
+
+	tests := []struct {
+		key int
+		val string
+	}{
+		{1, "one"},
+		{2, "two"},
+		{3, "three"},
+	}
+
+	i := 0
+	for e := range m.Iterator() {
+		if tests[i].key != e.key || tests[i].val != e.val {
+			t.Fatalf("expected: %+v got: %+v", tests[i], e)
+		}
+		i++
+	}
+}
+
+// Equality function for integers
+func intHash(a int) int {
+	return a
+}
+
+// Equality function for integers
+func intEqual(a, b int) bool {
+	return a == b
+}
+
+// Benchmark setup
+func randomInts(n int) []int {
+	nums := make([]int, n)
+	for i := 0; i < n; i++ {
+		nums[i] = rand.Intn(1000000)
+	}
+	return nums
+}
+
+func randomStringMap(n int) map[int]string {
+	m := make(map[int]string)
+	for i := 0; i < n; i++ {
+		m[rand.Intn(1000000)] = strconv.Itoa(i)
+	}
+	return m
+}
+
+// Benchmark Custom Map
+func BenchmarkCustomMap_Set(b *testing.B) {
+	nums := randomInts(10000)
+	m := New[int, string](intHash, intEqual)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Set(nums[i%10000], strconv.Itoa(nums[i%10000]))
+	}
+}
+
+func BenchmarkCustomMap_Get(b *testing.B) {
+	nums := randomInts(10000)
+	m := New[int, string](intHash, intEqual)
+	for _, n := range nums {
+		m.Set(n, strconv.Itoa(n))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Get(nums[i%10000])
+	}
+}
+
+func BenchmarkCustomMap_Delete(b *testing.B) {
+	nums := randomInts(10000)
+	m := New[int, string](intHash, intEqual)
+	for _, n := range nums {
+		m.Set(n, strconv.Itoa(n))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Delete(nums[i%10000])
+	}
+}
+
+// Benchmark Built-in Map
+func BenchmarkBuiltinMap_Set(b *testing.B) {
+	nums := randomInts(10000)
+	m := make(map[int]string)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m[nums[i%10000]] = strconv.Itoa(nums[i%10000])
+	}
+}
+
+func BenchmarkBuiltinMap_Get(b *testing.B) {
+	nums := randomInts(10000)
+	m := randomStringMap(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = m[nums[i%10000]]
+	}
+}
+
+func BenchmarkBuiltinMap_Delete(b *testing.B) {
+	nums := randomInts(10000)
+	m := randomStringMap(10000)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		delete(m, nums[i%10000])
+	}
 }

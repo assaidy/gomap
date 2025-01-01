@@ -1,5 +1,5 @@
 package gomap
 
-const DefaultNBuckets = 100
-
-// TODO: add default hash/equal funcs for local types
+func ComparableEqualFunc[T comparable](k1, k2 T) bool {
+	return k1 == k2
+}

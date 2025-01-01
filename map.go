@@ -5,6 +5,11 @@ import (
 	"slices"
 )
 
+const defaultNBuckets = 100
+
+type HashFunc[K any] func(K) int
+type EqualFunc[K any] func(K, K) bool
+
 type Entry[K, V any] struct {
 	key K
 	val V
@@ -14,21 +19,29 @@ type Map[K, V any] struct {
 	NBuckets  int
 	buckets   [][]Entry[K, V]
 	size      int
-	hashFunc  func(K) int
-	equalFunc func(K, K) bool
+	hashFunc  HashFunc[K]
+	equalFunc EqualFunc[K]
 }
 
-// TODO: maybe i will make nBuckets as optional param
-
 // New creates a new Map with the specified number of buckets, a hash function, and an equality function.
-func New[K, V any](nBuckets int, hashf func(K) int, equalf func(K, K) bool) *Map[K, V] {
-	return &Map[K, V]{
-		NBuckets:  nBuckets,
-		buckets:   make([][]Entry[K, V], nBuckets),
+func New[K, V any](hashf HashFunc[K], equalf EqualFunc[K], nBuckets ...int) *Map[K, V] {
+	var nBkts int
+	if len(nBuckets) != 0 {
+		nBkts = nBuckets[0]
+	} else {
+		nBkts = defaultNBuckets
+	}
+	m := &Map[K, V]{
+		NBuckets:  nBkts,
+		buckets:   make([][]Entry[K, V], nBkts),
 		size:      0,
 		hashFunc:  hashf,
 		equalFunc: equalf,
 	}
+	for i := range m.buckets {
+		m.buckets[i] = make([]Entry[K, V], 0, 20)
+	}
+	return m
 }
 
 // Set adds or updates a key-value pair in the map.
@@ -82,12 +95,12 @@ func (me *Map[K, V]) Size() int {
 	return me.size
 }
 
-// TODO: comment and test
-func (me *Map[K, V]) Iterator() iter.Seq[V] {
-	return func(yield func(V) bool) {
+// Iterator returns a sequence that allows iteration over all the values in the map.
+func (me *Map[K, V]) Iterator() iter.Seq[Entry[K, V]] {
+	return func(yield func(Entry[K, V]) bool) {
 		for _, bkt := range me.buckets {
 			for _, e := range bkt {
-				if !yield(e.val) {
+				if !yield(e) {
 					return
 				}
 			}
