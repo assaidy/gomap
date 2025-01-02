@@ -11,20 +11,20 @@ type HashFunc[K any] func(K) int
 type EqualFunc[K any] func(K, K) bool
 
 type Entry[K, V any] struct {
-	key K
-	val V
+	Key K
+	Val V
 }
 
 type Map[K, V any] struct {
 	NBuckets  int
 	buckets   [][]Entry[K, V]
 	size      int
-	hashFunc  HashFunc[K]
-	equalFunc EqualFunc[K]
+	hash  HashFunc[K]
+	equal EqualFunc[K]
 }
 
 // New creates a new Map with the specified number of buckets, a hash function, and an equality function.
-func New[K, V any](hashf HashFunc[K], equalf EqualFunc[K], nBuckets ...int) *Map[K, V] {
+func New[K, V any](hash HashFunc[K], equal EqualFunc[K], nBuckets ...int) *Map[K, V] {
 	var nBkts int
 	if len(nBuckets) != 0 {
 		nBkts = nBuckets[0]
@@ -35,8 +35,8 @@ func New[K, V any](hashf HashFunc[K], equalf EqualFunc[K], nBuckets ...int) *Map
 		NBuckets:  nBkts,
 		buckets:   make([][]Entry[K, V], nBkts),
 		size:      0,
-		hashFunc:  hashf,
-		equalFunc: equalf,
+		hash:  hash,
+		equal: equal,
 	}
 	for i := range m.buckets {
 		m.buckets[i] = make([]Entry[K, V], 0, 20)
@@ -47,28 +47,28 @@ func New[K, V any](hashf HashFunc[K], equalf EqualFunc[K], nBuckets ...int) *Map
 // Set adds or updates a key-value pair in the map.
 // If the key already exists, its value is updated; otherwise, a new entry is created.
 func (me *Map[K, V]) Set(k K, v V) {
-	bktIdx := me.hashFunc(k) % me.NBuckets
+	bktIdx := me.hash(k) % me.NBuckets
 
 	idx := slices.IndexFunc(me.buckets[bktIdx], func(e Entry[K, V]) bool {
-		return me.equalFunc(e.key, k)
+		return me.equal(e.Key, k)
 	})
 	if idx != -1 { // found
-		me.buckets[bktIdx][idx].val = v
+		me.buckets[bktIdx][idx].Val = v
 		return
 	}
 
-	me.buckets[bktIdx] = append(me.buckets[bktIdx], Entry[K, V]{key: k, val: v})
+	me.buckets[bktIdx] = append(me.buckets[bktIdx], Entry[K, V]{Key: k, Val: v})
 	me.size++
 }
 
 // Get retrieves the value associated with the given key.
 // Returns the value and true if the key exists, or the zero value and false if it does not.
 func (me *Map[K, V]) Get(k K) (V, bool) {
-	bktIdx := me.hashFunc(k) % me.NBuckets
+	bktIdx := me.hash(k) % me.NBuckets
 
 	for _, e := range me.buckets[bktIdx] {
-		if me.equalFunc(e.key, k) {
-			return e.val, true
+		if me.equal(e.Key, k) {
+			return e.Val, true
 		}
 	}
 
@@ -79,10 +79,10 @@ func (me *Map[K, V]) Get(k K) (V, bool) {
 // Delete removes the key-value pair associated with the given key from the map.
 // If the key does not exist, the map remains unchanged.
 func (me *Map[K, V]) Delete(k K) {
-	bktIdx := me.hashFunc(k) % me.NBuckets
+	bktIdx := me.hash(k) % me.NBuckets
 
 	idx := slices.IndexFunc(me.buckets[bktIdx], func(e Entry[K, V]) bool {
-		return me.equalFunc(e.key, k)
+		return me.equal(e.Key, k)
 	})
 	if idx != -1 { // found
 		me.buckets[bktIdx] = slices.Delete(me.buckets[bktIdx], idx, idx+1)

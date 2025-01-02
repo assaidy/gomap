@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func ComparableEqualFunc[T comparable](k1, k2 T) bool {
+	return k1 == k2
+}
+
 type CustomKey struct {
 	ID   int
 	Name string
@@ -133,7 +137,7 @@ func TestIterator(t *testing.T) {
 
 	i := 0
 	for e := range m.Iterator() {
-		if tests[i].key != e.key || tests[i].val != e.val {
+		if tests[i].key != e.Key || tests[i].val != e.Val {
 			t.Fatalf("expected: %+v got: %+v", tests[i], e)
 		}
 		i++
